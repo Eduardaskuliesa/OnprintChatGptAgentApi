@@ -7,6 +7,8 @@ interface AuthenticatedRequest extends Request {
 export const authenticate = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     const apiKey = req.headers['x-api-key'] as string;
 
+    let errorMessage
+
     if (!apiKey) {
         res.status(401).json({
             success: false,
