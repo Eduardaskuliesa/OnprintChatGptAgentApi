@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { drive, docs, sheets } from '../../services/google';
+import logger from '../../utils/logger';
 
 interface RequestBody {
     fileId?: string;
@@ -12,6 +13,7 @@ interface FileResponse {
     name?: string;
     content?: string;
     message?: string;
+    size?: string;
 }
 
 interface FolderResponse {
@@ -23,10 +25,33 @@ interface FolderResponse {
         content: string;
     }>;
     message?: string;
+    size?: string;
 }
 
 export const getFolderFilesContent = async (req: Request<{}, FileResponse | FolderResponse, RequestBody>, res: Response<FileResponse | FolderResponse>) => {
     const { fileId, folderId } = req.body;
+
+    const calculateResponseSize = (data: any): { bytes: number; kb: number; mb: number } => {
+        const jsonString = JSON.stringify(data);
+        const bytes = Buffer.byteLength(jsonString, 'utf8');
+        return {
+            bytes,
+            kb: parseFloat((bytes / 1024).toFixed(2)),
+            mb: parseFloat((bytes / (1024 * 1024)).toFixed(2))
+        };
+    };
+
+    const sendResponseWithSize = (data: any) => {
+        const size = calculateResponseSize(data);
+        const responseWithSize = {
+            ...data,
+            size: size.mb > 1 ? `${size.mb} MB` : `${size.kb} KB`
+        };
+
+        logger.info(`Response size: ${size.kb} KB`);
+
+        res.json(responseWithSize);
+    };
 
     try {
         if (fileId) {
@@ -47,12 +72,14 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                     )
                     .join('') || '';
 
-                res.json({
+                const responseData = {
                     success: true,
                     fileId: file.data.id!,
                     name: file.data.name!,
                     content
-                });
+                };
+
+                sendResponseWithSize(responseData);
                 return;
             }
 
@@ -74,21 +101,26 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                     return obj;
                 });
 
-                res.json({
+                const responseData = {
                     success: true,
                     fileId: file.data.id!,
                     name: file.data.name!,
                     content: JSON.stringify(rows, null, 2)
-                });
+                };
+
+                sendResponseWithSize(responseData);
                 return;
             }
 
-            res.json({
+            const errorResponse = {
                 success: false,
                 message: "Unsupported file type"
-            });
+            };
+
+            sendResponseWithSize(errorResponse);
             return;
         }
+
         if (folderId) {
             const folderInfo = await drive.files.get({
                 fileId: folderId,
@@ -148,23 +180,30 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                 }
             }
 
-            res.json({
+            const responseData = {
                 success: true,
                 folderName: folderInfo.data.name!,
                 files
-            });
+            };
+
+            sendResponseWithSize(responseData);
             return;
         }
 
-        res.json({
+        const errorResponse = {
             success: false,
             message: "Missing folderId or fileId"
-        });
+        };
+
+        sendResponseWithSize(errorResponse);
 
     } catch (error: any) {
-        res.status(500).json({
+        const errorResponse = {
             success: false,
             message: error.message
-        });
+        };
+
+        sendResponseWithSize(errorResponse);
+        res.status(500);
     }
 };
