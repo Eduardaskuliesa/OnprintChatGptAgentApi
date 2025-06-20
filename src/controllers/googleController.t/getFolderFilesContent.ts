@@ -31,13 +31,15 @@ interface FolderResponse {
 export const getFolderFilesContent = async (req: Request<{}, FileResponse | FolderResponse, RequestBody>, res: Response<FileResponse | FolderResponse>) => {
     const { fileId, folderId } = req.body;
 
-    const calculateResponseSize = (data: any): { bytes: number; kb: number; mb: number } => {
+    const calculateResponseSize = (data: any): { bytes: number; kb: number; mb: number; chars: number } => {
         const jsonString = JSON.stringify(data);
         const bytes = Buffer.byteLength(jsonString, 'utf8');
+        const chars = jsonString.length;
         return {
             bytes,
             kb: parseFloat((bytes / 1024).toFixed(2)),
-            mb: parseFloat((bytes / (1024 * 1024)).toFixed(2))
+            mb: parseFloat((bytes / (1024 * 1024)).toFixed(2)),
+            chars
         };
     };
 
@@ -47,8 +49,8 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
             ...data,
             size: size.mb > 1 ? `${size.mb} MB` : `${size.kb} KB`
         };
-
-        logger.info(`Response size: ${size.kb} KB`);
+        logger.info(`💾 Response size: ${size.kb}`)
+        logger.info(`📄 Characters in response: ${size.chars}`)
 
         res.json(responseWithSize);
     };
