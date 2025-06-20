@@ -49,57 +49,12 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
             ...data,
             size: size.mb > 1 ? `${size.mb} MB` : `${size.kb} KB`
         };
-
+        
         logger.info(`💾 Response size: ${size.kb} KB`);
         logger.info(`📄 Characters in response: ${size.chars}`);
         logger.info(`📁 Response contains - Files: ${fileCount}, Folders: ${folderCount}`);
 
         res.json(responseWithSize);
-    };
-
-    const extractDocContent = async (fileId: string) => {
-        const doc = await docs.documents.get({ documentId: fileId });
-        return doc.data.body?.content
-            ?.map(element =>
-                element.paragraph?.elements
-                    ?.map(el => el.textRun?.content || '')
-                    .join('')
-            )
-            .join('') || '';
-    };
-
-    const extractDocxContent = async (fileId: string) => {
-        try {
-            const response = await drive.files.export({
-                fileId: fileId,
-                mimeType: 'text/plain'
-            });
-            return response.data as string;
-        } catch (error) {
-            logger.error(`Failed to extract .docx content: ${error}`);
-            return 'Unable to extract content from .docx file';
-        }
-    };
-
-    const extractSheetContent = async (fileId: string) => {
-        const sheet = await sheets.spreadsheets.values.get({
-            spreadsheetId: fileId,
-            range: 'A:Z'
-        });
-
-        const values = sheet.data.values || [];
-        const headers = values[0] || [];
-        const rows = values.slice(1).map(row => {
-            const obj: Record<string, any> = {};
-            row.forEach((val, i) => {
-                if (headers[i]) {
-                    obj[headers[i]] = val;
-                }
-            });
-            return obj;
-        });
-
-        return JSON.stringify(rows, null, 2);
     };
 
     try {
@@ -110,46 +65,110 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
             });
 
             const mimeType = file.data.mimeType;
-            logger.info(`🔍 Processing file: ${file.data.name} (${mimeType})`);
 
-            let content = '';
             if (mimeType === 'application/vnd.google-apps.document') {
-                content = await extractDocContent(fileId);
-            }
-            else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-                content = await extractDocxContent(fileId);
-            }
-            else if (mimeType === 'application/vnd.google-apps.spreadsheet') {
-                content = await extractSheetContent(fileId);
-            }
-            else if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-                try {
-                    const response = await drive.files.export({
-                        fileId: fileId,
-                        mimeType: 'text/csv'
-                    });
-                    content = response.data as string;
-                } catch (error) {
-                    content = 'Unable to extract content from .xlsx file';
-                }
-            }
-            else {
-                const errorResponse = {
-                    success: false,
-                    message: `Unsupported file type: ${mimeType}`
+                const doc = await docs.documents.get({ documentId: fileId });
+                const content = doc.data.body?.content
+                    ?.map(element =>
+                        element.paragraph?.elements
+                            ?.map(el => el.textRun?.content || '')
+                            .join('')
+                    )
+                    .join('') || '';
+
+                const responseData = {
+                    success: true,
+                    fileId: file.data.id!,
+                    name: file.data.name!,
+                    content
                 };
-                sendResponseWithSize(errorResponse, 0, 0);
+
+                sendResponseWithSize(responseData, 1, 0);
                 return;
             }
 
-            const responseData = {
-                success: true,
-                fileId: file.data.id!,
-                name: file.data.name!,
-                content
+    
+            if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                try {
+                   
+                    const copiedFile = await drive.files.copy({
+                        fileId: fileId,
+                        requestBody: {
+                            name: `temp_${file.data.name}`,
+                            mimeType: 'application/vnd.google-apps.document'
+                        }
+                    });
+
+                    
+                    const doc = await docs.documents.get({ documentId: copiedFile.data.id! });
+                    const content = doc.data.body?.content
+                        ?.map(element =>
+                            element.paragraph?.elements
+                                ?.map(el => el.textRun?.content || '')
+                                .join('')
+                        )
+                        .join('') || '';
+
+    
+                    await drive.files.delete({ fileId: copiedFile.data.id! });
+
+                    const responseData = {
+                        success: true,
+                        fileId: file.data.id!,
+                        name: file.data.name!,
+                        content
+                    };
+
+                    sendResponseWithSize(responseData, 1, 0);
+                    return;
+                } catch (error) {
+                    logger.error(`Failed to read .docx file: ${error}`);
+                    
+                    const errorResponse = {
+                        success: false,
+                        message: `Failed to process .docx file: ${error}`
+                    };
+
+                    sendResponseWithSize(errorResponse, 0, 0);
+                    return;
+                }
+            }
+
+            if (mimeType === 'application/vnd.google-apps.spreadsheet') {
+                const sheet = await sheets.spreadsheets.values.get({
+                    spreadsheetId: fileId,
+                    range: 'A:Z'
+                });
+
+                const values = sheet.data.values || [];
+                const headers = values[0] || [];
+                const rows = values.slice(1).map(row => {
+                    const obj: Record<string, any> = {};
+                    row.forEach((val, i) => {
+                        if (headers[i]) {
+                            obj[headers[i]] = val;
+                        }
+                    });
+                    return obj;
+                });
+
+                const responseData = {
+                    success: true,
+                    fileId: file.data.id!,
+                    name: file.data.name!,
+                    content: JSON.stringify(rows, null, 2)
+                };
+
+                sendResponseWithSize(responseData, 1, 0);
+                return;
+            }
+
+            const errorResponse = {
+                success: false,
+                message: `Unsupported file type: ${mimeType}`
             };
 
-            sendResponseWithSize(responseData, 1, 0);
+            sendResponseWithSize(errorResponse, 0, 0);
             return;
         }
 
@@ -168,33 +187,77 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
             for (const file of filesResponse.data.files || []) {
                 const mimeType = file.mimeType;
-                let content = '';
-                if (mimeType === 'application/vnd.google-apps.document') {
-                    content = await extractDocContent(file.id!);
-                }
-                else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-                    content = await extractDocxContent(file.id!);
-                }
-                else if (mimeType === 'application/vnd.google-apps.spreadsheet') {
-                    content = await extractSheetContent(file.id!);
-                }
-                else if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-                    try {
-                        const response = await drive.files.export({
-                            fileId: file.id!,
-                            mimeType: 'text/csv'
-                        });
-                        content = response.data as string;
-                    } catch (error) {
-                        content = 'Unable to extract content from .xlsx file';
-                    }
-                }
 
-                if (content) {
+                if (mimeType === 'application/vnd.google-apps.document') {
+                    const doc = await docs.documents.get({ documentId: file.id! });
+                    const content = doc.data.body?.content
+                        ?.map(element =>
+                            element.paragraph?.elements
+                                ?.map(el => el.textRun?.content || '')
+                                .join('')
+                        )
+                        .join('') || '';
+
                     files.push({
                         fileId: file.id!,
                         name: file.name!,
                         content
+                    });
+                }
+
+                if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                    try {
+                        const copiedFile = await drive.files.copy({
+                            fileId: file.id!,
+                            requestBody: {
+                                name: `temp_${file.name}`,
+                                mimeType: 'application/vnd.google-apps.document'
+                            }
+                        });
+
+                        const doc = await docs.documents.get({ documentId: copiedFile.data.id! });
+                        const content = doc.data.body?.content
+                            ?.map(element =>
+                                element.paragraph?.elements
+                                    ?.map(el => el.textRun?.content || '')
+                                    .join('')
+                            )
+                            .join('') || '';
+
+                        await drive.files.delete({ fileId: copiedFile.data.id! });
+
+                        files.push({
+                            fileId: file.id!,
+                            name: file.name!,
+                            content
+                        });
+                    } catch (error) {
+                        logger.error(`Failed to read .docx file ${file.name}: ${error}`);
+                    }
+                }
+
+                if (mimeType === 'application/vnd.google-apps.spreadsheet') {
+                    const sheet = await sheets.spreadsheets.values.get({
+                        spreadsheetId: file.id!,
+                        range: 'A:Z'
+                    });
+
+                    const values = sheet.data.values || [];
+                    const headers = values[0] || [];
+                    const rows = values.slice(1).map(row => {
+                        const obj: Record<string, any> = {};
+                        row.forEach((val, i) => {
+                            if (headers[i]) {
+                                obj[headers[i]] = val;
+                            }
+                        });
+                        return obj;
+                    });
+
+                    files.push({
+                        fileId: file.id!,
+                        name: file.name!,
+                        content: JSON.stringify(rows, null, 2)
                     });
                 }
             }
@@ -217,8 +280,8 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
         sendResponseWithSize(errorResponse, 0, 0);
 
     } catch (error: any) {
-        logger.error(`❌ Error occurred: ${error.message}`);
-
+        logger.error(`❌ Error: ${error.message}`);
+        
         const errorResponse = {
             success: false,
             message: error.message
