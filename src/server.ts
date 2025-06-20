@@ -25,9 +25,9 @@ app.get('/health', (req, res) => {
 
 routes(app);
 
-app.use('*', (req, res) => {
+app.use((req, res) => {
     res.setHeader('Connection', 'close');
-    res.status(444).end(); 
+    res.status(444).end();
 });
 
 app.listen(port, () => {
