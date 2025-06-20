@@ -49,7 +49,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
             ...data,
             size: size.mb > 1 ? `${size.mb} MB` : `${size.kb} KB`
         };
-        
+
         logger.info(`💾 Response size: ${size.kb} KB`);
         logger.info(`📄 Characters in response: ${size.chars}`);
         logger.info(`📁 Response contains - Files: ${fileCount}, Folders: ${folderCount}`);
@@ -68,29 +68,54 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
             if (mimeType === 'application/vnd.google-apps.document') {
                 const doc = await docs.documents.get({ documentId: fileId });
-                const content = doc.data.body?.content
-                    ?.map(element =>
-                        element.paragraph?.elements
-                            ?.map(el => el.textRun?.content || '')
-                            .join('')
-                    )
-                    .join('') || '';
+
+                let content = '';
+
+                if (doc.data.body?.content) {
+                    for (const element of doc.data.body.content) {
+                        if (element.paragraph?.elements) {
+                            const paragraphText = element.paragraph.elements
+                                .map(el => el.textRun?.content || '')
+                                .join('');
+                            content += paragraphText;
+                        }
+
+                        if (element.table?.tableRows) {
+                            content += '\n\n[TABLE]\n';
+                            for (const row of element.table.tableRows) {
+                                const rowData: string[] = [];
+                                for (const cell of row.tableCells || []) {
+                                    let cellText = '';
+                                    for (const cellElement of cell.content || []) {
+                                        if (cellElement.paragraph?.elements) {
+                                            cellText += cellElement.paragraph.elements
+                                                .map(el => el.textRun?.content || '')
+                                                .join('');
+                                        }
+                                    }
+                                    rowData.push(cellText.trim());
+                                }
+                                content += rowData.join(' | ') + '\n';
+                            }
+                            content += '[/TABLE]\n\n';
+                        }
+                    }
+                }
 
                 const responseData = {
                     success: true,
                     fileId: file.data.id!,
                     name: file.data.name!,
-                    content
+                    content: content || ''
                 };
 
                 sendResponseWithSize(responseData, 1, 0);
                 return;
             }
 
-    
             if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                 try {
-                   
+                
                     const copiedFile = await drive.files.copy({
                         fileId: fileId,
                         requestBody: {
@@ -99,7 +124,6 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                         }
                     });
 
-                    
                     const doc = await docs.documents.get({ documentId: copiedFile.data.id! });
                     const content = doc.data.body?.content
                         ?.map(element =>
@@ -109,7 +133,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                         )
                         .join('') || '';
 
-    
+                
                     await drive.files.delete({ fileId: copiedFile.data.id! });
 
                     const responseData = {
@@ -123,7 +147,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                     return;
                 } catch (error) {
                     logger.error(`Failed to read .docx file: ${error}`);
-                    
+
                     const errorResponse = {
                         success: false,
                         message: `Failed to process .docx file: ${error}`
@@ -190,23 +214,52 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
                 if (mimeType === 'application/vnd.google-apps.document') {
                     const doc = await docs.documents.get({ documentId: file.id! });
-                    const content = doc.data.body?.content
-                        ?.map(element =>
-                            element.paragraph?.elements
-                                ?.map(el => el.textRun?.content || '')
-                                .join('')
-                        )
-                        .join('') || '';
+
+                    let content = '';
+
+                    if (doc.data.body?.content) {
+                        for (const element of doc.data.body.content) {
+                    
+                            if (element.paragraph?.elements) {
+                                const paragraphText = element.paragraph.elements
+                                    .map(el => el.textRun?.content || '')
+                                    .join('');
+                                content += paragraphText;
+                            }
+
+                           
+                            if (element.table?.tableRows) {
+                                content += '\n\n[TABLE]\n';
+                                for (const row of element.table.tableRows) {
+                                    const rowData: string[] = [];
+                                    for (const cell of row.tableCells || []) {
+                                        let cellText = '';
+                                        for (const cellElement of cell.content || []) {
+                                            if (cellElement.paragraph?.elements) {
+                                                cellText += cellElement.paragraph.elements
+                                                    .map(el => el.textRun?.content || '')
+                                                    .join('');
+                                            }
+                                        }
+                                        rowData.push(cellText.trim());
+                                    }
+                                    content += rowData.join(' | ') + '\n';
+                                }
+                                content += '[/TABLE]\n\n';
+                            }
+                        }
+                    }
 
                     files.push({
                         fileId: file.id!,
                         name: file.name!,
-                        content
+                        content: content || ''
                     });
                 }
 
                 if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                     try {
+                       
                         const copiedFile = await drive.files.copy({
                             fileId: file.id!,
                             requestBody: {
@@ -215,6 +268,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                             }
                         });
 
+                    
                         const doc = await docs.documents.get({ documentId: copiedFile.data.id! });
                         const content = doc.data.body?.content
                             ?.map(element =>
@@ -224,6 +278,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                             )
                             .join('') || '';
 
+                    
                         await drive.files.delete({ fileId: copiedFile.data.id! });
 
                         files.push({
@@ -281,7 +336,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
     } catch (error: any) {
         logger.error(`❌ Error: ${error.message}`);
-        
+
         const errorResponse = {
             success: false,
             message: error.message
