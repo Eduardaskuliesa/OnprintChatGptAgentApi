@@ -10,6 +10,10 @@ const port = 4040;
 app.use(express.json())
 app.use(morgan('dev'));
 
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 routes(app);
 
 app.listen(port, () => {
