@@ -1,12 +1,15 @@
 import { Request, Response } from "express";
 import { drive } from "../../services/google";
 
+const SHARED_FOLDER_ID = '1h3bVdCaO1rq4AArJl7U_32WomA2N07Ji';
+
 export const getFoldersWithFiles = async (req: Request, res: Response) => {
     try {
+
         const folderResponse = await drive.files.list({
-            q: "mimeType='application/vnd.google-apps.folder'",
-            fields: 'files(id, name, parents)'
-        })
+            q: `'${SHARED_FOLDER_ID}' in parents and trashed = false`,
+            fields: 'files(id, name, parents, mimeType)'
+        });
 
         const folders = folderResponse.data.files || [];
         const result = [];
@@ -25,7 +28,7 @@ export const getFoldersWithFiles = async (req: Request, res: Response) => {
 
             for (const file of filesResponse.data.files || []) {
                 if (file.mimeType === 'application/vnd.google-apps.folder') {
-                    processedIds.add(file.id); 
+                    processedIds.add(file.id);
 
                     const subFilesResponse = await drive.files.list({
                         q: `'${file.id}' in parents`,

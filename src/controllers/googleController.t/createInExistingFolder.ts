@@ -4,6 +4,9 @@ import { CreateItem, processItems } from "../../heleprs/proccessItems";
 import logger from "../../utils/logger";
 
 
+
+
+
 export const createInExistingFolder = async (req: Request, res: Response) => {
     try {
         const { parentFolderId, items }: { parentFolderId: string, items: CreateItem[] } = req.body;
@@ -27,11 +30,8 @@ export const createInExistingFolder = async (req: Request, res: Response) => {
             res.status(400).json({ error: 'Provided ID is not a folder' });
             return
         }
-       
+
         const createdItems = await processItems(items, parentFolderId);
-
-
-        logger.success(`Created items in folder: ${folder.data.name}`);
 
         res.json({
             success: true,

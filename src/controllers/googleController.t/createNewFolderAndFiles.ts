@@ -18,9 +18,14 @@ export const createNewFoldersAndFiles = async (req: Request, res: Response) => {
         }
 
         const createdItems = await processItems(items, targetFolderId as string);
-        
+
+        if (createdItems.success === false) {
+            res.status(500).json({ error: 'Failed to create items', message: createdItems?.message as string });
+            return;
+        }
+
         logger.success(`Created items in folder: chat-gpt-duombazė`);
-        
+
         res.json({
             success: true,
             message: 'Files and folders created successfully',

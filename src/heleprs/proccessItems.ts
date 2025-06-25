@@ -15,28 +15,38 @@ export interface CreateItem {
     children?: CreateItem[];
 }
 
-export const processItems = async (items: CreateItem[], parentId?: string): Promise<CreatedItem[]> => {
+export const processItems = async (items: CreateItem[], parentId?: string) => {
     const result: CreatedItem[] = [];
-    
+
     for (const item of items) {
         const fileId = await createGoogleFile(item.name, item.type, parentId);
-        
-        if (item.content && (item.type === 'doc' || item.type === 'sheet')) {
-            await addContentToFile(fileId as string, item.type, item.content);
+
+        if (fileId.success === false) {
+            return {
+                success: false,
+                message: fileId.message
+            }
         }
-        
+
+        if (item.content && (item.type === 'doc' || item.type === 'sheet')) {
+            await addContentToFile(fileId.fileId as string, item.type, item.content);
+        }
+
         const createdItem: CreatedItem = {
             name: item.name,
             type: item.type,
-            id: fileId as string
+            id: fileId.fileId as string
         };
-        
+
         if (item.children && item.children.length > 0) {
-            createdItem.children = await processItems(item.children, fileId as string);
+            createdItem.children = await processItems(item.children, fileId.fileId as string) as unknown as CreatedItem[];
         }
-        
+
         result.push(createdItem);
     }
-    
-    return result;
+
+    return {
+        success: true,
+        created: result
+    };
 };
