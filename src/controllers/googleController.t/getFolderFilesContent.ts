@@ -45,16 +45,17 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
     const sendResponseWithSize = (data: any, fileCount: number = 0, folderCount: number = 0) => {
         const size = calculateResponseSize(data);
-        const responseWithSize = {
+        const responseStats = {
             ...data,
-            size: size.mb > 1 ? `${size.mb} MB` : `${size.kb} KB`
+            size: size.mb > 1 ? `${size.mb} MB` : `${size.kb} KB`,
+            char: size.chars,
         };
 
         logger.info(`💾 Response size: ${size.kb} KB`);
         logger.info(`📄 Characters in response: ${size.chars}`);
         logger.info(`📁 Response contains - Files: ${fileCount}, Folders: ${folderCount}`);
 
-        res.json(responseWithSize);
+        res.json(responseStats);
     };
 
     try {
@@ -115,7 +116,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
             if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                 try {
-                
+
                     const copiedFile = await drive.files.copy({
                         fileId: fileId,
                         requestBody: {
@@ -133,7 +134,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                         )
                         .join('') || '';
 
-                
+
                     await drive.files.delete({ fileId: copiedFile.data.id! });
 
                     const responseData = {
@@ -219,7 +220,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
                     if (doc.data.body?.content) {
                         for (const element of doc.data.body.content) {
-                    
+
                             if (element.paragraph?.elements) {
                                 const paragraphText = element.paragraph.elements
                                     .map(el => el.textRun?.content || '')
@@ -227,7 +228,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                                 content += paragraphText;
                             }
 
-                           
+
                             if (element.table?.tableRows) {
                                 content += '\n\n[TABLE]\n';
                                 for (const row of element.table.tableRows) {
@@ -259,7 +260,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
                 if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                     try {
-                       
+
                         const copiedFile = await drive.files.copy({
                             fileId: file.id!,
                             requestBody: {
@@ -268,7 +269,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                             }
                         });
 
-                    
+
                         const doc = await docs.documents.get({ documentId: copiedFile.data.id! });
                         const content = doc.data.body?.content
                             ?.map(element =>
@@ -278,7 +279,7 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                             )
                             .join('') || '';
 
-                    
+
                         await drive.files.delete({ fileId: copiedFile.data.id! });
 
                         files.push({
