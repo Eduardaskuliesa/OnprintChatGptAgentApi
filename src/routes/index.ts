@@ -3,7 +3,7 @@ import { googleRoutes } from "./googleRoutes";
 import { authenticate } from "../controllers/middleware/auth";
 
 const routes = (server: Express) => {
-    server.use('/api', authenticate);
+    // server.use('/api', authenticate);
     googleRoutes(server)
 }
 

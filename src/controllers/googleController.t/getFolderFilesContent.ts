@@ -28,6 +28,43 @@ interface FolderResponse {
     size?: string;
 }
 
+const processGoogleSheet = async (spreadsheetId: string) => {
+    const spreadsheet = await sheets.spreadsheets.get({
+        spreadsheetId: spreadsheetId,
+        includeGridData: true
+    });
+
+    const result = {
+        spreadsheetId: spreadsheetId,
+        title: spreadsheet.data.properties?.title,
+        sheets: spreadsheet.data.sheets?.map(sheet => ({
+            sheetId: sheet.properties?.sheetId,
+            sheetName: sheet.properties?.title,
+            rowCount: sheet.properties?.gridProperties?.rowCount,
+            columnCount: sheet.properties?.gridProperties?.columnCount,
+
+            cells: sheet.data?.[0]?.rowData?.map((row, rowIndex) => ({
+                row: rowIndex + 1,
+                data: row.values?.map((cell, colIndex) => ({
+                    address: `${String.fromCharCode(65 + colIndex)}${rowIndex + 1}`,
+                    column: String.fromCharCode(65 + colIndex),
+                    value: cell.effectiveValue?.stringValue ??
+                        cell.effectiveValue?.numberValue ??
+                        cell.effectiveValue?.boolValue ??
+                        cell.formattedValue ?? '',
+                    formula: cell.userEnteredValue?.formulaValue || null,
+                    type: cell.effectiveValue?.stringValue !== undefined ? 'text' :
+                        cell.effectiveValue?.numberValue !== undefined ? 'number' :
+                            cell.effectiveValue?.boolValue !== undefined ? 'boolean' :
+                                cell.userEnteredValue?.formulaValue ? 'formula' : 'empty'
+                })) || []
+            })).filter(row => row.data.some(cell => cell.value !== '')) || []
+        })) || []
+    };
+
+    return JSON.stringify(result, null, 2);
+};
+
 export const getFolderFilesContent = async (req: Request<{}, FileResponse | FolderResponse, RequestBody>, res: Response<FileResponse | FolderResponse>) => {
     const { fileId, folderId } = req.body;
 
@@ -116,7 +153,6 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
             if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                 try {
-
                     const copiedFile = await drive.files.copy({
                         fileId: fileId,
                         requestBody: {
@@ -133,7 +169,6 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                                 .join('')
                         )
                         .join('') || '';
-
 
                     await drive.files.delete({ fileId: copiedFile.data.id! });
 
@@ -160,28 +195,13 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
             }
 
             if (mimeType === 'application/vnd.google-apps.spreadsheet') {
-                const sheet = await sheets.spreadsheets.values.get({
-                    spreadsheetId: fileId,
-                    range: 'A:Z'
-                });
-
-                const values = sheet.data.values || [];
-                const headers = values[0] || [];
-                const rows = values.slice(1).map(row => {
-                    const obj: Record<string, any> = {};
-                    row.forEach((val, i) => {
-                        if (headers[i]) {
-                            obj[headers[i]] = val;
-                        }
-                    });
-                    return obj;
-                });
+                const content = await processGoogleSheet(fileId);
 
                 const responseData = {
                     success: true,
                     fileId: file.data.id!,
                     name: file.data.name!,
-                    content: JSON.stringify(rows, null, 2)
+                    content
                 };
 
                 sendResponseWithSize(responseData, 1, 0);
@@ -220,14 +240,12 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
                     if (doc.data.body?.content) {
                         for (const element of doc.data.body.content) {
-
                             if (element.paragraph?.elements) {
                                 const paragraphText = element.paragraph.elements
                                     .map(el => el.textRun?.content || '')
                                     .join('');
                                 content += paragraphText;
                             }
-
 
                             if (element.table?.tableRows) {
                                 content += '\n\n[TABLE]\n';
@@ -260,7 +278,6 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
 
                 if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                     try {
-
                         const copiedFile = await drive.files.copy({
                             fileId: file.id!,
                             requestBody: {
@@ -268,7 +285,6 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                                 mimeType: 'application/vnd.google-apps.document'
                             }
                         });
-
 
                         const doc = await docs.documents.get({ documentId: copiedFile.data.id! });
                         const content = doc.data.body?.content
@@ -278,7 +294,6 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                                     .join('')
                             )
                             .join('') || '';
-
 
                         await drive.files.delete({ fileId: copiedFile.data.id! });
 
@@ -293,27 +308,12 @@ export const getFolderFilesContent = async (req: Request<{}, FileResponse | Fold
                 }
 
                 if (mimeType === 'application/vnd.google-apps.spreadsheet') {
-                    const sheet = await sheets.spreadsheets.values.get({
-                        spreadsheetId: file.id!,
-                        range: 'A:Z'
-                    });
-
-                    const values = sheet.data.values || [];
-                    const headers = values[0] || [];
-                    const rows = values.slice(1).map(row => {
-                        const obj: Record<string, any> = {};
-                        row.forEach((val, i) => {
-                            if (headers[i]) {
-                                obj[headers[i]] = val;
-                            }
-                        });
-                        return obj;
-                    });
+                    const content = await processGoogleSheet(file.id!);
 
                     files.push({
                         fileId: file.id!,
                         name: file.name!,
-                        content: JSON.stringify(rows, null, 2)
+                        content
                     });
                 }
             }
