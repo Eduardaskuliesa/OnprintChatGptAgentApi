@@ -6,7 +6,13 @@ interface UpdateRequest {
     fileId: string;
     type: 'doc' | 'sheet';
     content: string | string[][];
-    action: 'replace' | 'append';
+    action: 'replace' | 'append' | 'update';
+    sheetName?: string;
+    targetCells?: string; // "A5:C7"
+    updates?: Array<{ // For batch updates
+        range: string;
+        values: string[][];
+    }>;
 }
 
 const updateDocContent = async (fileId: string, content: string, action: 'replace' | 'append') => {
@@ -49,17 +55,24 @@ const updateDocContent = async (fileId: string, content: string, action: 'replac
     }
 };
 
-const updateSheetContent = async (fileId: string, content: string[][], action: 'replace' | 'append') => {
+
+
+const updateSheetContent = async (fileId: string, content: string[][], action: string, options?: {
+    sheetName?: string;
+    targetCells?: string;
+    updates?: Array<{ range: string; values: string[][]; }>;
+}) => {
+    const sheetName = options?.sheetName || 'Sheet1';
+
     switch (action) {
         case 'replace':
             await sheets.spreadsheets.values.clear({
                 spreadsheetId: fileId,
-                range: 'A:Z'
+                range: `${sheetName}!A:Z`
             });
-
             await sheets.spreadsheets.values.update({
                 spreadsheetId: fileId,
-                range: 'A1',
+                range: `${sheetName}!A1`,
                 valueInputOption: 'RAW',
                 requestBody: { values: content }
             });
@@ -68,10 +81,32 @@ const updateSheetContent = async (fileId: string, content: string[][], action: '
         case 'append':
             await sheets.spreadsheets.values.append({
                 spreadsheetId: fileId,
-                range: 'A:Z',
+                range: `${sheetName}!A:Z`,
                 valueInputOption: 'RAW',
                 requestBody: { values: content }
             });
+            break;
+
+        case 'update':
+            if (options?.targetCells) {
+                await sheets.spreadsheets.values.update({
+                    spreadsheetId: fileId,
+                    range: `${sheetName}!${options.targetCells}`,
+                    valueInputOption: 'RAW',
+                    requestBody: { values: content }
+                });
+            } else if (options?.updates) {
+                await sheets.spreadsheets.values.batchUpdate({
+                    spreadsheetId: fileId,
+                    requestBody: {
+                        valueInputOption: 'RAW',
+                        data: options.updates.map(update => ({
+                            range: `${sheetName}!${update.range}`,
+                            values: update.values
+                        }))
+                    }
+                });
+            }
             break;
 
         default:
@@ -81,21 +116,22 @@ const updateSheetContent = async (fileId: string, content: string[][], action: '
 
 export const updateFileContent = async (req: Request, res: Response) => {
     try {
-        logger.info('Received update file content request');
-        const { fileId, type, content, action }: UpdateRequest = req.body;
+        const { fileId, type, content, action, sheetName, targetCells, updates }: UpdateRequest = req.body;
+
         console.log(req.body)
+
         switch (type) {
             case 'doc':
-                await updateDocContent(fileId, content as string, action);
+                await updateDocContent(fileId, content as string, action as 'replace' | 'append');
                 break;
 
             case 'sheet':
-                await updateSheetContent(fileId, content as string[][], action);
+                await updateSheetContent(fileId, content as string[][], action, {
+                    sheetName,
+                    targetCells,
+                    updates
+                });
                 break;
-
-            default:
-                res.status(400).json({ error: `Unsupported file type: ${type}` });
-                return
         }
 
         res.json({
