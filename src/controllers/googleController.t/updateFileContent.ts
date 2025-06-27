@@ -1,12 +1,14 @@
 import { Request, Response } from "express";
 import { docs, sheets } from "../../services/google";
 import logger from "../../utils/logger";
+import { createBackUp} from "../../heleprs/createBackUp";
 
 interface UpdateRequest {
     fileId: string;
     type: 'doc' | 'sheet';
     content: string | string[][];
     action: 'replace' | 'append' | 'update';
+    conversationId: string
     sheetName?: string;
     targetCells?: string; // "A5:C7"
     updates?: Array<{ // For batch updates
@@ -64,6 +66,8 @@ const updateSheetContent = async (fileId: string, content: string[][], action: s
 }) => {
     const sheetName = options?.sheetName || 'Sheet1';
 
+
+
     switch (action) {
         case 'replace':
             await sheets.spreadsheets.values.clear({
@@ -116,9 +120,9 @@ const updateSheetContent = async (fileId: string, content: string[][], action: s
 
 export const updateFileContent = async (req: Request, res: Response) => {
     try {
-        const { fileId, type, content, action, sheetName, targetCells, updates }: UpdateRequest = req.body;
+        const { fileId, type, content, action, sheetName, targetCells, updates, conversationId }: UpdateRequest = req.body;
 
-        console.log(req.body)
+        await createBackUp(fileId)
 
         switch (type) {
             case 'doc':

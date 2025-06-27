@@ -3,6 +3,11 @@ import { drive } from "../../services/google";
 
 const SHARED_FOLDER_ID = '1h3bVdCaO1rq4AArJl7U_32WomA2N07Ji';
 
+const EXCLUDED_FOLDER_IDS = [
+    '17fCNpZskdbJkqmayVkI82-hU4tvLC23U',
+    '1AjqzzPh3PzcRJAF1O-NimHG83CiyMBOs'
+];
+
 export const getFoldersWithFiles = async (req: Request, res: Response) => {
     try {
 
@@ -11,11 +16,13 @@ export const getFoldersWithFiles = async (req: Request, res: Response) => {
             fields: 'files(id, name, parents, mimeType)'
         });
 
-        const folders = folderResponse.data.files || [];
+        const filteredFolders = folderResponse.data.files?.filter(file =>
+            !EXCLUDED_FOLDER_IDS.includes(file.id as string)
+        ) || [];
         const result = [];
         const processedIds = new Set();
 
-        for (const folder of folders) {
+        for (const folder of filteredFolders) {
             if (!folder.parents) continue;
             if (processedIds.has(folder.id)) continue;
 

@@ -9,6 +9,7 @@ export const googleRoutes = async (server: Express) => {
     server.post('/api/create-new', googleController.createNewFoldersAndFiles)
     server.get('/api/folders', googleController.getFoldersWithFiles)
     server.post('/api/content', googleController.getFolderFilesContent)
+    server.post('/api/archive-file', googleController.deleteFolderFiles);
 }
 
 export default router;
