@@ -122,7 +122,7 @@ export const updateFileContent = async (req: Request, res: Response) => {
     try {
         const { fileId, type, content, action, sheetName, targetCells, updates, conversationId }: UpdateRequest = req.body;
 
-        createBackUp(fileId, conversationId)
+        await createBackUp(fileId)
 
         switch (type) {
             case 'doc':
