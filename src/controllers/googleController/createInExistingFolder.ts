@@ -3,10 +3,6 @@ import { drive } from "../../services/google";
 import { CreateItem, processItems } from "../../heleprs/proccessItems";
 import logger from "../../utils/logger";
 
-
-
-
-
 export const createInExistingFolder = async (req: Request, res: Response) => {
     try {
         const { parentFolderId, items }: { parentFolderId: string, items: CreateItem[] } = req.body;
