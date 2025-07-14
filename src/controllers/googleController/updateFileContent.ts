@@ -64,7 +64,7 @@ const updateSheetContent = async (fileId: string, content: string[][], action: s
     targetCells?: string;
     updates?: Array<{ range: string; values: string[][]; }>;
 }) => {
-    const sheetName = options?.sheetName || 'Sheet1';
+    const sheetName = options?.sheetName || 'Lapas1';
 
 
 

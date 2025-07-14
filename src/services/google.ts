@@ -1,14 +1,15 @@
 import { google } from 'googleapis';
 
-export const auth = new google.auth.GoogleAuth({
-    keyFile: './credentials.json',
-    scopes: [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive',
-        'https://www.googleapis.com/auth/documents'
-    ],
-});
+const oAuth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI || ""
+)
 
-export const sheets = google.sheets({ version: 'v4', auth });
-export const drive = google.drive({ version: 'v3', auth });
-export const docs = google.docs({ version: 'v1', auth });
+oAuth2Client.setCredentials({
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN || ""
+})
+
+export const sheets = google.sheets({ version: "v4", auth: oAuth2Client })
+export const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+export const docs = google.docs({ version: 'v1', auth: oAuth2Client });
