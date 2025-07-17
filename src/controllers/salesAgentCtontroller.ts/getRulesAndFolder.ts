@@ -5,9 +5,8 @@ import logger from '../../utils/logger';
 const SHARED_FOLDER_ID = '1h3bVdCaO1rq4AArJl7U_32WomA2N07Ji';
 const SALES_AGENT_FOLDER_ID = "1_qW_fhOsNllPEjqY_3bIqmATguk2mNQt";
 
-const EXCLUDED_FOLDER_IDS = [
-    '17fCNpZskdbJkqmayVkI82-hU4tvLC23U',
-    '1AjqzzPh3PzcRJAF1O-NimHG83CiyMBOs'
+const INCLUDE_FOLDERS_ONLY = [
+    '1ZwnjuEQY-2_2LMaZ1hIiV7uj6XhLFu3b'
 ];
 
 // Helper function to process file content (reused from your existing code)
@@ -15,7 +14,7 @@ const processFileContent = async (fileId: string, mimeType: string, fileName: st
     try {
         if (mimeType === 'application/vnd.google-apps.document') {
             const doc = await docs.documents.get({ documentId: fileId });
-            
+
             let content = '';
             if (doc.data.body?.content) {
                 for (const element of doc.data.body.content) {
@@ -124,7 +123,7 @@ export async function getRulesAndFolder(req: Request, res: Response) {
         });
 
         const filteredFolders = folderResponse.data.files?.filter(file =>
-            !EXCLUDED_FOLDER_IDS.includes(file.id as string)
+            INCLUDE_FOLDERS_ONLY.includes(file.id as string)
         ) || [];
 
         let folders = [];
@@ -144,23 +143,10 @@ export async function getRulesAndFolder(req: Request, res: Response) {
             for (const file of filesResponse.data.files || []) {
                 if (file.mimeType === 'application/vnd.google-apps.folder') {
                     processedIds.add(file.id);
-
-                    const subFilesResponse = await drive.files.list({
-                        q: `'${file.id}' in parents`,
-                        fields: 'files(id, name, mimeType)'
-                    });
-
-                    const subFiles = subFilesResponse.data.files?.map(subFile => ({
-                        type: 'file',
-                        name: subFile.name,
-                        id: subFile.id
-                    })) || [];
-
                     files.push({
                         type: 'folder',
                         name: file.name,
-                        id: file.id,
-                        files: subFiles
+                        id: file.id
                     });
                 } else {
                     files.push({
@@ -180,9 +166,8 @@ export async function getRulesAndFolder(req: Request, res: Response) {
             processedIds.add(folder.id);
         }
 
-        // Get Sales Agent Rules from specific folder
         logger.info(`Getting sales agent rules from folder: ${SALES_AGENT_FOLDER_ID}`);
-        
+
         const salesRulesResponse = await drive.files.list({
             q: `'${SALES_AGENT_FOLDER_ID}' in parents and trashed = false`,
             fields: 'files(id, name, mimeType)'
@@ -192,7 +177,7 @@ export async function getRulesAndFolder(req: Request, res: Response) {
 
         for (const file of salesRulesResponse.data.files || []) {
             const content = await processFileContent(file.id!, file.mimeType!, file.name!);
-            
+
             salesAgentRules.push({
                 fileId: file.id,
                 name: file.name,
@@ -211,9 +196,9 @@ export async function getRulesAndFolder(req: Request, res: Response) {
 
     } catch (error: any) {
         logger.error(`❌ Error in getRulesAndFolder: ${error.message}`);
-        res.status(500).json({ 
-            success: false, 
-            error: error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 }
