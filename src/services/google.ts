@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { refreshToken, GPT_ID } from '../tokens/google-refresh-token';
+import logger from '../utils/logger';
 
 const oAuth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -7,8 +8,12 @@ const oAuth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_REDIRECT_URI || ""
 )
 
+const token = refreshToken.get(GPT_ID);
+
+logger.info("Refresh Token:", token);
+
 oAuth2Client.setCredentials({
-    refresh_token: refreshToken.get(GPT_ID) || "",
+    refresh_token: token || "",
 })
 
 export const sheets = google.sheets({ version: "v4", auth: oAuth2Client })
