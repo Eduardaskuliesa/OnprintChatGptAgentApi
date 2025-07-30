@@ -6,9 +6,6 @@ const router = Router();
 
 export const googleRoutes = async (server: Express) => {
     server.get('/api/google-consent', googleController.getGoogleConsentUrl)   
-    server.get('/oauth2callback', googleController.handleOAuthCallback);
-
-
     server.post('/api/create-in-folder', googleController.createInExistingFolder);
     server.post('/api/update-file', googleController.updateFileContent)
     server.post('/api/create-new', googleController.createNewFoldersAndFiles)
