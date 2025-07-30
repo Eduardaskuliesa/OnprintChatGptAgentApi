@@ -5,7 +5,7 @@ import { salesAgentRoutes } from "./salesAgentRoutes";
 
 
 const routes = (server: Express) => {
-    // server.use(authenticate);
+    server.use(authenticate);
     googleRoutes(server)
     salesAgentRoutes(server)
 }
