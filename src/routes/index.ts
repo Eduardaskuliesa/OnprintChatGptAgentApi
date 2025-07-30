@@ -6,7 +6,7 @@ import { googleController } from "../controllers/googleController";
 
 
 const routes = (server: Express) => {
-    server.get('/oauth2callback', googleController.handleOAuthCallback);
+    server.get('/api/oauth2callback', googleController.handleOAuthCallback);
     server.use(authenticate);
     googleRoutes(server)
     salesAgentRoutes(server)
