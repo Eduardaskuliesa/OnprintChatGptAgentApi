@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { google } from 'googleapis';
+import { GPT_ID, refreshToken } from '../../tokens/google-refresh-token';
+import logger from '../../utils/logger';
+
 
 export const handleOAuthCallback = async (req: Request, res: Response) => {
     const code = req.query.code as string;
@@ -17,8 +20,12 @@ export const handleOAuthCallback = async (req: Request, res: Response) => {
 
     try {
         const { tokens } = await oAuth2Client.getToken(code);
-        console.log('Access Token:', tokens.access_token);
-        console.log('Refresh Token:', tokens.refresh_token);
+
+        if (tokens.refresh_token) {
+            refreshToken.set(GPT_ID, tokens.refresh_token)
+        }
+        logger.info('Access Token:', tokens.access_token);
+        logger.info('Refresh Token:', tokens.refresh_token);
 
         res.send(`Tokens received. Refresh Token: ${tokens.refresh_token}`);
     } catch (error) {

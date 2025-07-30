@@ -19,6 +19,7 @@ export const getGoogleConsentUrl = (req: Request, res: Response) => {
         access_type: 'offline',  
         prompt: 'consent',  
         scope: scopes,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI
     });
 
     res.json({ authUrl });

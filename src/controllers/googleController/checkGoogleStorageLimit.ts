@@ -1,6 +1,4 @@
 import { Request, Response } from 'express';
-import { google } from 'googleapis';
-import path from 'path';
 import { drive } from '../../services/google';
 
 
