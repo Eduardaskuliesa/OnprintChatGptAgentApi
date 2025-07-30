@@ -8,13 +8,18 @@ const oAuth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_REDIRECT_URI || ""
 )
 
-const token = refreshToken.get(GPT_ID);
-
-logger.info("Refresh Token:", token);
+logger.info("Refresh Token:", refreshToken.get(GPT_ID));
 
 oAuth2Client.setCredentials({
-    refresh_token: token || "",
-})
+    refresh_token: refreshToken.get(GPT_ID) || ""
+});
+
+export const updateCredentials = () => {
+    oAuth2Client.setCredentials({
+        refresh_token: refreshToken.get(GPT_ID) || ""
+    });
+};
+
 
 export const sheets = google.sheets({ version: "v4", auth: oAuth2Client })
 export const drive = google.drive({ version: 'v3', auth: oAuth2Client });
